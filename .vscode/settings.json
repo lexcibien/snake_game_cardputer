@@ -1,0 +1,15 @@
+{
+  "cSpell.words": [
+    "arduino",
+    "cardputer",
+    "Cardputer",
+    "DARDUINO",
+    "DCORE",
+    "DESP",
+    "devkitc"
+  ],
+  "files.associations": {
+    ".env.*": "dotenv",
+    "algorithm": "cpp"
+  }
+}
