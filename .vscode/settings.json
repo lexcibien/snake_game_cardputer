@@ -1,15 +1,28 @@
 {
   "cSpell.words": [
     "arduino",
+    "buildcache",
     "cardputer",
     "Cardputer",
+    "compiledb",
     "DARDUINO",
     "DCORE",
     "DESP",
-    "devkitc"
+    "devkitc",
+    "gccarmnoneeabi",
+    "Lovyan",
+    "unflags",
+    "Werror"
   ],
   "files.associations": {
     ".env.*": "dotenv",
-    "algorithm": "cpp"
-  }
+    "algorithm": "cpp",
+    "ranges": "cpp",
+    "istream": "cpp",
+    "ostream": "cpp"
+  },
+  "editor.codeActionsOnSave": {
+    "source.organizeImports": "always"
+  },
+  "sonarlint.pathToCompileCommands": "${workspaceFolder}\\compile_commands.json",
 }
