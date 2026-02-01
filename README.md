@@ -1,23 +1,24 @@
 # game-snake-m5cardputer
-Game Snake M5Cartputer Stamp ESP32 S3
 
-## Device information:
+An evolved version of game-snake-m5cardputer [game-snake-m5cardputer](https://github.com/ZrutrA/game-snake-m5cardputer) from ZrutrA
 
-https://docs.m5stack.com/en/core/Cardputer
+## Device information
 
-## Appearance of the device running the Snake game:
+<https://docs.m5stack.com/en/core/Cardputer>
 
-![fot1](https://raw.githubusercontent.com/ZrutrA/game-snake-m5cardputer/main/snake-game.jpg)
+## Appearance of the device running the Snake game
 
-## Game controls: 
+![game-picture](assets/snake-game.jpg)
 
-left: ","
+## Game controls
 
-right: "/"
+left: "," or left arrow
 
-up: ";"
+right: "/" or right arrow
 
-down: "."
+up: ";" or up arrow
+
+down: "." or down arrow
 
 pause - "p"
 
@@ -29,4 +30,10 @@ If an SD memory card is inserted in the device, the largest number of fruit eate
 
 ## How to install a game from a .bin file?
 
-Open https://web.esphome.io/ in a browser that supports WebSerial (Google Chrome or Microsoft Edge). Click "Connect", select the appropriate port, click "Connect". Then click "Install", point to the snake-M5Cardputer.bin file and click "Install". Ready.
+### Via ESPHome
+
+Open <https://web.esphome.io/> in a browser that supports WebSerial (Google Chrome or Microsoft Edge). Click "Connect", select the appropriate port, click "Connect". Then click "Install", point to the snake-M5Cardputer.bin file and click "Install". Ready.
+
+### Via M5Burner
+
+Just find this project in the list, hit "Download" Button and then "Burn" when ready (don't forget to connect to device and select the device COM port).
