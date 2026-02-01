@@ -1,4 +1,5 @@
 #include <M5Cardputer.h>
+#include <ArduinoJson.h>
 #include <vector>
 #include <SD.h>
 #include <SPI.h>
@@ -27,6 +28,7 @@ struct Player {
   Position prevTail;
   int speedMultiplier = 1;
   int fruitsEaten = 0;
+  bool eatFruit = false;
 };
 
 struct Fruit {
@@ -38,11 +40,11 @@ struct GameState {
   bool isPaused = false;
   int highScore = 0;
   bool sdCardInserted = false;
-  const char* recordFile = "/snake-record.txt";
+  const char* recordFile = "/snake-config.json";
 };
 
 void initSD(GameState* game);
-void saveHighScore(GameState game);
+void saveHighScore(const GameState& game);
 void initGame(GameState* game);
 void readButtons(SnakeDirection* direction, bool* isPaused);
 void readPauseButton(bool* isPaused);
@@ -52,8 +54,10 @@ void checkCollision(std::vector<Position>& snake, GameState* game);
 void playGameOverSound();
 void displayGameOver(int fruitsEaten, int highScore);
 void drawStaticElements(int fruitsEaten, int highScore, const Position& fruit);
-void draw(const Player& snake, int highScore);
+void draw(Player* snake, int highScore);
 void placeFruit(const std::vector<Position>& snake, Position* fruit);
+void printScoreBoard(int fruitsEaten, int highScore);
+void saveGameConfig(const GameState& game);
 
 __attribute__((noreturn)) void setup() {
   GameState game;
@@ -73,45 +77,56 @@ void initSD(GameState* game) {
   static SPIClass SPICardputer(FSPI);
   SPICardputer.begin(SDCARD_SCK, SDCARD_MISO, SDCARD_MOSI);
 
-  Serial.println("initSD: iniciando SD card...");
+  Serial.println("initSD: initializing SD card...");
   if (!SD.begin(SDCARD_CS, SPICardputer)) {
     Serial.println("initSD: Card Mount Failed");
     game->highScore = 0;
     game->sdCardInserted = false;
+    return;
+  }
+
+  Serial.println("initSD: Card mounted with success");
+  game->sdCardInserted = true;
+  if (SD.exists(game->recordFile)) {
+    loadGameConfig(game);
   } else {
-    Serial.println("initSD: Card mounted com sucesso");
-    game->sdCardInserted = true;
-    if (SD.exists(game->recordFile)) {
-      File file = SD.open(game->recordFile);
-      if (file) {
-        game->highScore = file.parseInt();
-        Serial.print("initSD: highScore lido = ");
-        Serial.println(game->highScore);
-        file.close();
-      }
-    } else {
-      if (File file = SD.open(game->recordFile, FILE_WRITE); file) {
-        file.println("0");
-        file.close();
-        Serial.println("initSD: recordFile criado com 0");
-      }
-      game->highScore = 0;
-    }
+    saveGameConfig(*game);
+    game->highScore = 0;
   }
 }
 
-void saveHighScore(GameState game) {
-  if (game.highScore > 0 && game.sdCardInserted) { //TODO Check this if can be a trouble.
-    Serial.print("saveHighScore: escrevendo highScore = ");
+void saveGameConfig(const GameState& game) {
+  JsonDocument doc;
+
+  doc["highScore"] = game.highScore;
+  doc["difficulty"] = 1;
+
+  if (File file = SD.open(game.recordFile, FILE_WRITE); file) {
+    serializeJson(doc, file);
+    file.close();
+    Serial.println("saveGameConfig: write OK");
+  } else {
+    Serial.println("saveGameConfig: fail to open file to write");
+  }
+}
+
+void loadGameConfig(GameState* game) {
+  if (File file = SD.open(game->recordFile); file) {
+    JsonDocument doc;
+    deserializeJson(doc, file);
+    game->highScore = doc["highScore"] | 0;
+    Serial.print("loadGameConfig: highScore read = ");
+    Serial.println(game->highScore);
+    file.close();
+  }
+}
+
+void saveHighScore(const GameState& game) {
+  if (game.highScore > 0 && game.sdCardInserted) {
+    Serial.print("saveHighScore: writing highScore = ");
     Serial.println(game.highScore);
-    File file = SD.open(game.recordFile, FILE_WRITE);
-    if (file) {
-      file.println(game.highScore);
-      file.close();
-      Serial.println("saveHighScore: escrita OK");
-    } else {
-      Serial.println("saveHighScore: falha ao abrir arquivo para escrita");
-    }
+
+    saveGameConfig(game);
   }
 }
 
@@ -149,7 +164,7 @@ __attribute__((noreturn)) void initGame(GameState* game) {
           readButtons(&snake.direction, &game->isPaused);
           moveSnake(&snake, &fruit, game);
           checkCollision(snake.position, game);
-          draw(snake, game->highScore);
+          draw(&snake, game->highScore);
           lastTime = currentTime;
         }
       } else {
@@ -166,7 +181,7 @@ __attribute__((noreturn)) void initGame(GameState* game) {
   }
 }
 
-void loop() { // Usado em initGame
+void loop() { // Used on initGame
   M5Cardputer.update();
 }
 
@@ -180,10 +195,10 @@ void readButtons(SnakeDirection* direction, bool* isPaused) {
     *direction = DOWN;
   }
   if (M5Cardputer.Keyboard.isKeyPressed(',') && *direction != RIGHT) {
-    *direction = LEFT; // Left
+    *direction = LEFT;
   }
   if (M5Cardputer.Keyboard.isKeyPressed('/') && *direction != LEFT) {
-    *direction = RIGHT; // Right
+    *direction = RIGHT;
   }
   readPauseButton(isPaused);
 }
@@ -235,6 +250,7 @@ void moveSnake(Player* snake, Fruit* fruit, GameState* game) {
     M5Cardputer.Display.fillCircle(fruit->position.x, fruit->position.y, SNAKE_SIZE, TFT_BLACK);
     placeFruit(snake->position, &fruit->position);
     snake->fruitsEaten = snake->fruitsEaten + 1; // Increase counter of eaten fruits
+    snake->eatFruit = true;
     // Check if speed threshold has been exceeded
     if (snake->fruitsEaten > game->highScore) {
       game->highScore = snake->fruitsEaten;
@@ -250,7 +266,7 @@ void checkCollision(std::vector<Position>& snake, GameState* game) {
   for (int i = 1; i < snake.size(); i++) {
     if (snake[0].x == snake[i].x && snake[0].y == snake[i].y) {
       game->gameOver = true;
-      game->isPaused = false; // Umożliwia wyświetlenie napisu "GAME OVER" tylko raz
+      game->isPaused = false; // Added to draw "GAME OVER" message only once
     }
   }
 }
@@ -282,48 +298,46 @@ void displayGameOver(int fruitsEaten, int highScore) {
   M5Cardputer.Display.print("p - pause");
 
   M5Cardputer.Display.setTextColor(TFT_WHITE, TFT_BLACK);
-  M5Cardputer.Display.setCursor(0, 0);
-  M5Cardputer.Display.print("Fruits ");
-  M5Cardputer.Display.print(fruitsEaten);
-  M5Cardputer.Display.print(" Record ");
-  M5Cardputer.Display.println(highScore);
+  printScoreBoard(fruitsEaten, highScore);
 }
 
 void drawStaticElements(int fruitsEaten, int highScore, const Position& fruit) {
   M5Cardputer.Display.setTextSize(2); // Set font size to 2
+  printScoreBoard(fruitsEaten, highScore);
+  M5Cardputer.Display.fillCircle(fruit.x, fruit.y, SNAKE_SIZE, TFT_RED);
+}
+
+void draw(Player* snake, int highScore) {
+  // Update fruit count without clearing the entire TFT
+  M5Cardputer.Display.setTextSize(2); // Set font size to 2
+  if (snake->eatFruit || (snake->prevTail.x <= TFT_WIDTH && snake->prevTail.y <= 20)) {
+    printScoreBoard(snake->fruitsEaten, highScore);
+    snake->eatFruit = false;
+  }
+
+  // Redraw snake
+  M5Cardputer.Display.fillRect(snake->prevTail.x, snake->prevTail.y, SNAKE_SIZE, SNAKE_SIZE, TFT_BLACK);
+  for (const auto& p : snake->position) {
+    M5Cardputer.Display.fillRect(p.x, p.y, SNAKE_SIZE, SNAKE_SIZE, TFT_GREEN);
+  }
+}
+
+void printScoreBoard(int fruitsEaten, int highScore) {
   M5Cardputer.Display.setCursor(0, 0);
   M5Cardputer.Display.print("Fruits ");
   M5Cardputer.Display.print(fruitsEaten);
   M5Cardputer.Display.print(" Record ");
   M5Cardputer.Display.println(highScore);
-  M5Cardputer.Display.fillCircle(fruit.x, fruit.y, SNAKE_SIZE, TFT_RED);
 }
 
-void draw(const Player& snake, int highScore) {
-  // Update fruit count without clearing the entire TFT
-  M5Cardputer.Display.fillRect(0, 0, TFT_WIDTH, 20, TFT_BLACK); // Reduced the height of the cleaning area
-  M5Cardputer.Display.setTextSize(2); // Set font size to 2
-  M5Cardputer.Display.setCursor(0, 0);
-  M5Cardputer.Display.print("Fruits ");
-  M5Cardputer.Display.print(snake.fruitsEaten);
-  M5Cardputer.Display.print(" Record ");
-  M5Cardputer.Display.println(highScore);
-
-  // Redraw snake
-  M5Cardputer.Display.fillRect(snake.prevTail.x, snake.prevTail.y, SNAKE_SIZE, SNAKE_SIZE, TFT_BLACK);
-  for (const auto& p : snake.position) {
-    M5Cardputer.Display.fillRect(p.x, p.y, SNAKE_SIZE, SNAKE_SIZE, TFT_GREEN);
-  }
-}
-
-void placeFruit(const std::vector<Position>& snake, Position* fruit) {
+void placeFruit(const std::vector<Position>& snakePosition, Position* fruit) {
   bool safePlacement;
   do {
     safePlacement = true;
     fruit->x = random(0, TFT_WIDTH / SNAKE_SIZE) * SNAKE_SIZE;
     fruit->y = random(20 / SNAKE_SIZE, TFT_HEIGHT / SNAKE_SIZE) * SNAKE_SIZE; // Adjusted to start at y = 20
     // Check if fruit is not too close to snake
-    for (const auto& p : snake) {
+    for (const auto& p : snakePosition) {
       if (abs(p.x - fruit->x) < COLLISION_OFFSET && abs(p.y - fruit->y) < COLLISION_OFFSET) {
         safePlacement = false;
         break;

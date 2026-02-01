@@ -115,5 +115,5 @@
   "editor.codeActionsOnSave": {
     "source.organizeImports": "always"
   },
-  "sonarlint.pathToCompileCommands": "${workspaceFolder}\\compile_commands.json",
+  "sonarlint.pathToCompileCommands": "${workspaceFolder}/compile_commands.json",
 }
