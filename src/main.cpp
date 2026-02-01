@@ -1,9 +1,8 @@
 #include <M5Cardputer.h>
 #include <vector>
 #include <SD.h>
+#include <SPI.h>
 
-#define SCREEN_WIDTH 240
-#define SCREEN_HEIGHT 135
 #define SNAKE_SIZE 5
 #define COLLISION_OFFSET 10
 #define GROWTH_INCREMENT 2
@@ -65,26 +64,33 @@ __attribute__((noreturn)) void setup() {
   M5Cardputer.Display.setTextColor(TFT_WHITE, TFT_BLACK);
   M5Cardputer.Display.fillScreen(TFT_BLACK);
   Serial.begin(115200);
-  // initSD(&game);
+  initSD(&game);
   initGame(&game);
 }
 
 void initSD(GameState* game) {
-  if (!SD.begin()) {
-    Serial.println("Card Mount Failed");
+  static SPIClass SPI(FSPI);
+  SPI.begin(SDCARD_SCK, SDCARD_MISO, SDCARD_MOSI);
+
+  Serial.println("initSD: iniciando SD card...");
+  if (!SD.begin(SDCARD_CS, SPI)) {
+    Serial.println("initSD: Card Mount Failed");
     game->highScore = 0;
   } else {
+    Serial.println("initSD: Card mounted com sucesso");
     if (SD.exists(game->recordFile)) {
       File file = SD.open(game->recordFile);
       if (file) {
         game->highScore = file.parseInt();
+        Serial.print("initSD: highScore lido = ");
+        Serial.println(game->highScore);
         file.close();
       }
     } else {
-      File file = SD.open(game->recordFile, FILE_WRITE);
-      if (file) {
+      if (File file = SD.open(game->recordFile, FILE_WRITE); file) {
         file.println("0");
         file.close();
+        Serial.println("initSD: recordFile criado com 0");
       }
       game->highScore = 0;
     }
@@ -93,10 +99,15 @@ void initSD(GameState* game) {
 
 void saveHighScore(GameState game) {
   if (game.highScore > 0) {
+    Serial.print("saveHighScore: escrevendo highScore = ");
+    Serial.println(game.highScore);
     File file = SD.open(game.recordFile, FILE_WRITE);
     if (file) {
       file.println(game.highScore);
       file.close();
+      Serial.println("saveHighScore: escrita OK");
+    } else {
+      Serial.println("saveHighScore: falha ao abrir arquivo para escrita");
     }
   }
 }
@@ -201,10 +212,10 @@ void moveSnake(Player* snake, Fruit* fruit, GameState* game) {
   }
 
   // Handle screen wrapping
-  if (next.x >= SCREEN_WIDTH) next.x = 0;
-  if (next.x < 0) next.x = SCREEN_WIDTH - SNAKE_SIZE;
-  if (next.y >= SCREEN_HEIGHT) next.y = 0;
-  if (next.y < 0) next.y = SCREEN_HEIGHT - SNAKE_SIZE;
+  if (next.x >= TFT_WIDTH) next.x = 0;
+  if (next.x < 0) next.x = TFT_WIDTH - SNAKE_SIZE;
+  if (next.y >= TFT_HEIGHT) next.y = 0;
+  if (next.y < 0) next.y = TFT_HEIGHT - SNAKE_SIZE;
 
   // move tail to front
   snake->position.insert(snake->position.begin(), next);
@@ -224,7 +235,7 @@ void moveSnake(Player* snake, Fruit* fruit, GameState* game) {
     // Sprawdź, czy przekroczono próg dla przyspieszenia
     if (snake->fruitsEaten > game->highScore) {
       game->highScore = snake->fruitsEaten;
-      // saveHighScore(*game);
+      saveHighScore(*game);
     }
     if (snake->fruitsEaten % SPEEDUP_THRESHOLD == 0) {
       snake->speedMultiplier += 1; // Zwiększ współczynnik przyspieszenia
@@ -286,8 +297,8 @@ void drawStaticElements(int fruitsEaten, int highScore, const Position& fruit) {
 }
 
 void draw(const Player& snake, int highScore) {
-  // Update fruit count without clearing the entire screen
-  M5Cardputer.Display.fillRect(0, 0, SCREEN_WIDTH, 20, TFT_BLACK); // Zmniejszono wysokość obszaru czyszczenia
+  // Update fruit count without clearing the entire TFT
+  M5Cardputer.Display.fillRect(0, 0, TFT_WIDTH, 20, TFT_BLACK); // Zmniejszono wysokość obszaru czyszczenia
   M5Cardputer.Display.setTextSize(2); // Ustaw rozmiar czcionki na 2
   M5Cardputer.Display.setCursor(0, 0);
   M5Cardputer.Display.print("Fruits ");
@@ -306,8 +317,8 @@ void placeFruit(const std::vector<Position>& snake, Position* fruit) {
   bool safePlacement;
   do {
     safePlacement = true;
-    fruit->x = random(0, SCREEN_WIDTH / SNAKE_SIZE) * SNAKE_SIZE;
-    fruit->y = random(20 / SNAKE_SIZE, SCREEN_HEIGHT / SNAKE_SIZE) * SNAKE_SIZE; // Adjusted to start at y = 20
+    fruit->x = random(0, TFT_WIDTH / SNAKE_SIZE) * SNAKE_SIZE;
+    fruit->y = random(20 / SNAKE_SIZE, TFT_HEIGHT / SNAKE_SIZE) * SNAKE_SIZE; // Adjusted to start at y = 20
     // Sprawdź czy owoc nie jest zbyt blisko węża
     for (const auto& p : snake) {
       if (abs(p.x - fruit->x) < COLLISION_OFFSET && abs(p.y - fruit->y) < COLLISION_OFFSET) {

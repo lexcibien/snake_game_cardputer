@@ -9,8 +9,11 @@
     "DCORE",
     "DESP",
     "devkitc",
+    "FSPI",
     "gccarmnoneeabi",
     "Lovyan",
+    "MOSI",
+    "SDCARD",
     "unflags",
     "Werror"
   ],

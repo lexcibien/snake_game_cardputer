@@ -11,3 +11,4 @@
 - [ ] Melhorar frame rate
 - [ ] Corrigir rerender desnecessários (scoreboard)
 - [ ] Separar em mais arquivos (seguir exemplo do outro snake)
+- [ ] Implementar um algo no launcher para pegar o tema e o app buscar esse tema
