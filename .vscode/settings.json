@@ -15,7 +15,8 @@
     "MOSI",
     "SDCARD",
     "unflags",
-    "Werror"
+    "Werror",
+    "Zrutr"
   ],
   "files.associations": {
     ".env.*": "dotenv",
