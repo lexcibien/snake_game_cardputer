@@ -37,6 +37,7 @@ struct GameState {
   bool gameOver = false;
   bool isPaused = false;
   int highScore = 0;
+  bool sdCardInserted = false;
   const char* recordFile = "/snake-record.txt";
 };
 
@@ -69,15 +70,17 @@ __attribute__((noreturn)) void setup() {
 }
 
 void initSD(GameState* game) {
-  static SPIClass SPI(FSPI);
-  SPI.begin(SDCARD_SCK, SDCARD_MISO, SDCARD_MOSI);
+  static SPIClass SPICardputer(FSPI);
+  SPICardputer.begin(SDCARD_SCK, SDCARD_MISO, SDCARD_MOSI);
 
   Serial.println("initSD: iniciando SD card...");
-  if (!SD.begin(SDCARD_CS, SPI)) {
+  if (!SD.begin(SDCARD_CS, SPICardputer)) {
     Serial.println("initSD: Card Mount Failed");
     game->highScore = 0;
+    game->sdCardInserted = false;
   } else {
     Serial.println("initSD: Card mounted com sucesso");
+    game->sdCardInserted = true;
     if (SD.exists(game->recordFile)) {
       File file = SD.open(game->recordFile);
       if (file) {
@@ -98,7 +101,7 @@ void initSD(GameState* game) {
 }
 
 void saveHighScore(GameState game) {
-  if (game.highScore > 0) {
+  if (game.highScore > 0 && game.sdCardInserted) { //TODO Check this if can be a trouble.
     Serial.print("saveHighScore: escrevendo highScore = ");
     Serial.println(game.highScore);
     File file = SD.open(game.recordFile, FILE_WRITE);
@@ -122,13 +125,13 @@ __attribute__((noreturn)) void initGame(GameState* game) {
     snake.position.push_back({ 60 - i * SNAKE_SIZE, 60 });
   }
 
-  snake.direction = SnakeDirection::RIGHT; // Ustaw kierunek domyślny na prawo
-  snake.fruitsEaten = 0; // Zresetuj licznik zjedzonych owoców
-  snake.speedMultiplier = 0; // Zresetuj współczynnik przyspieszenia
-  placeFruit(snake.position, &fruit.position); // Umieść owoc w losowym miejscu
+  snake.direction = SnakeDirection::RIGHT; // Set default direction to right
+  snake.fruitsEaten = 0; // Reset counter of eaten fruits
+  snake.speedMultiplier = 0; // Reset speed multiplier
+  placeFruit(snake.position, &fruit.position); // Place fruit in a random location
   M5Cardputer.Display.clear();
-  game->gameOver = false; // Reset stanu końca gry
-  game->isPaused = false; // Reset stanu pauzy
+  game->gameOver = false; // Reset game over state
+  game->isPaused = false; // Reset pause state
 
 
   drawStaticElements(snake.fruitsEaten, game->highScore, fruit.position);
@@ -153,10 +156,10 @@ __attribute__((noreturn)) void initGame(GameState* game) {
         readPauseButton(&game->isPaused);
       }
     } else {
-      if (!game->isPaused) { // Dodano, aby rysować napis "GAME OVER" tylko raz
+      if (!game->isPaused) { // Added to draw "GAME OVER" message only once
         playGameOverSound();
         displayGameOver(snake.fruitsEaten, game->highScore);
-        game->isPaused = true; // Zatrzymanie dalszego rysowania
+        game->isPaused = true; // Stop further drawing
       }
       readRestartButton(game);
     }
@@ -186,16 +189,16 @@ void readButtons(SnakeDirection* direction, bool* isPaused) {
 }
 
 void readPauseButton(bool* isPaused) {
-  if (M5Cardputer.Keyboard.isKeyPressed('p')) { // Przycisk 'p' na klawiaturze
+  if (M5Cardputer.Keyboard.isKeyPressed('p')) { // Button 'p' on the keyboard
     *isPaused = !*isPaused;
-    delay(200); // Opóźnienie, aby uniknąć podwójnego przełączania
+    delay(200); // Delay to avoid double switching
   }
 }
 
 void readRestartButton(GameState* game) {
-  if (M5Cardputer.Keyboard.isKeyPressed('n')) { // Przycisk 'n' na klawiaturze
-    delay(200); // Opóźnienie, aby uniknąć podwójnego przełączania
-    initGame(game); // Inicjalizuj grę od nowa
+  if (M5Cardputer.Keyboard.isKeyPressed('n')) { // Button 'n' on the keyboard
+    delay(200); // Delay to avoid double switching
+    initGame(game); // Initialize the game again
   }
 }
 
@@ -217,28 +220,28 @@ void moveSnake(Player* snake, Fruit* fruit, GameState* game) {
   if (next.y >= TFT_HEIGHT) next.y = 0;
   if (next.y < 0) next.y = TFT_HEIGHT - SNAKE_SIZE;
 
-  // move tail to front
+  // Move tail to front
   snake->position.insert(snake->position.begin(), next);
   snake->position.pop_back();
 
   // Check if snake eats the fruit
   if (abs(snake->position[0].x - fruit->position.x) < COLLISION_OFFSET && abs(snake->position[0].y - fruit->position.y) < COLLISION_OFFSET) {
     for (int i = 0; i < GROWTH_INCREMENT; i++) {
-      snake->position.push_back(snake->position.back()); // Zwiększ długość węża
+      snake->position.push_back(snake->position.back()); // Increase snake length
     }
     // Play sound
-    M5Cardputer.Speaker.tone(4000, 100); // Zagraj krótki dźwięk przy zjedzeniu owocu
+    M5Cardputer.Speaker.tone(4000, 100); // Play a short sound when eating fruit
     // Clear the previous fruit
     M5Cardputer.Display.fillCircle(fruit->position.x, fruit->position.y, SNAKE_SIZE, TFT_BLACK);
     placeFruit(snake->position, &fruit->position);
-    snake->fruitsEaten = snake->fruitsEaten + 1; // Zwiększ licznik zjedzonych owoców
-    // Sprawdź, czy przekroczono próg dla przyspieszenia
+    snake->fruitsEaten = snake->fruitsEaten + 1; // Increase counter of eaten fruits
+    // Check if speed threshold has been exceeded
     if (snake->fruitsEaten > game->highScore) {
       game->highScore = snake->fruitsEaten;
       saveHighScore(*game);
     }
     if (snake->fruitsEaten % SPEEDUP_THRESHOLD == 0) {
-      snake->speedMultiplier += 1; // Zwiększ współczynnik przyspieszenia
+      snake->speedMultiplier += 1; // Increase speed multiplier
     }
   }
 }
@@ -253,7 +256,7 @@ void checkCollision(std::vector<Position>& snake, GameState* game) {
 }
 
 void playGameOverSound() {
-  // Zagraj trzy krótkie dźwięki o rosnącej częstotliwości
+  // Play three short sounds with increasing frequency
   M5Cardputer.Speaker.tone(2000, 100);
   delay(150);
   M5Cardputer.Speaker.tone(3000, 100);
@@ -267,15 +270,15 @@ void displayGameOver(int fruitsEaten, int highScore) {
   M5Cardputer.Display.setTextSize(2);
 
   M5Cardputer.Display.setTextColor(TFT_RED, TFT_BLACK);
-  M5Cardputer.Display.setCursor(50, 40); // Przesunięto w górę
+  M5Cardputer.Display.setCursor(50, 40); // Moved up
   M5Cardputer.Display.print("GAME OVER");
 
   M5Cardputer.Display.setTextColor(TFT_GREEN, TFT_BLACK);
-  M5Cardputer.Display.setCursor(50, 70); // Przesunięto w górę
+  M5Cardputer.Display.setCursor(50, 70); // Moved up
   M5Cardputer.Display.print("n - new game");
 
   M5Cardputer.Display.setTextColor(TFT_CYAN, TFT_BLACK);
-  M5Cardputer.Display.setCursor(50, 100); // Dodano napis
+  M5Cardputer.Display.setCursor(50, 100); // Added message
   M5Cardputer.Display.print("p - pause");
 
   M5Cardputer.Display.setTextColor(TFT_WHITE, TFT_BLACK);
@@ -287,7 +290,7 @@ void displayGameOver(int fruitsEaten, int highScore) {
 }
 
 void drawStaticElements(int fruitsEaten, int highScore, const Position& fruit) {
-  M5Cardputer.Display.setTextSize(2); // Ustaw rozmiar czcionki na 2
+  M5Cardputer.Display.setTextSize(2); // Set font size to 2
   M5Cardputer.Display.setCursor(0, 0);
   M5Cardputer.Display.print("Fruits ");
   M5Cardputer.Display.print(fruitsEaten);
@@ -298,8 +301,8 @@ void drawStaticElements(int fruitsEaten, int highScore, const Position& fruit) {
 
 void draw(const Player& snake, int highScore) {
   // Update fruit count without clearing the entire TFT
-  M5Cardputer.Display.fillRect(0, 0, TFT_WIDTH, 20, TFT_BLACK); // Zmniejszono wysokość obszaru czyszczenia
-  M5Cardputer.Display.setTextSize(2); // Ustaw rozmiar czcionki na 2
+  M5Cardputer.Display.fillRect(0, 0, TFT_WIDTH, 20, TFT_BLACK); // Reduced the height of the cleaning area
+  M5Cardputer.Display.setTextSize(2); // Set font size to 2
   M5Cardputer.Display.setCursor(0, 0);
   M5Cardputer.Display.print("Fruits ");
   M5Cardputer.Display.print(snake.fruitsEaten);
@@ -319,7 +322,7 @@ void placeFruit(const std::vector<Position>& snake, Position* fruit) {
     safePlacement = true;
     fruit->x = random(0, TFT_WIDTH / SNAKE_SIZE) * SNAKE_SIZE;
     fruit->y = random(20 / SNAKE_SIZE, TFT_HEIGHT / SNAKE_SIZE) * SNAKE_SIZE; // Adjusted to start at y = 20
-    // Sprawdź czy owoc nie jest zbyt blisko węża
+    // Check if fruit is not too close to snake
     for (const auto& p : snake) {
       if (abs(p.x - fruit->x) < COLLISION_OFFSET && abs(p.y - fruit->y) < COLLISION_OFFSET) {
         safePlacement = false;
