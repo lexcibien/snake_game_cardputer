@@ -1,6 +1,7 @@
 {
   "cSpell.words": [
     "arduino",
+    "bblanchon",
     "buildcache",
     "cardputer",
     "Cardputer",
@@ -11,6 +12,7 @@
     "devkitc",
     "FSPI",
     "gccarmnoneeabi",
+    "jsonfiles",
     "Lovyan",
     "MOSI",
     "SDCARD",
