@@ -11,6 +11,8 @@
 #define SPEEDUP_THRESHOLD 5
 #define SPEEDUP_PERCENTAGE 10
 
+#define PATH_TO_CONFIG "/snake-config.json"
+
 enum class SnakeDirection {
   RIGHT = 0,
   DOWN,
@@ -41,7 +43,7 @@ struct GameState {
   bool isPaused = false;
   int highScore = 0;
   bool sdCardInserted = false;
-  const char* recordFile = "/snake-config.json";
+  const char* recordFile = PATH_TO_CONFIG;
 };
 
 void initSD(GameState* game);
