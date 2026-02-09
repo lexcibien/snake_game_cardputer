@@ -3,6 +3,7 @@
 #include <vector>
 #include <SD.h>
 #include <SPI.h>
+#include <bitmap_icons.h>
 
 #define SNAKE_SIZE 5
 #define COLLISION_OFFSET 10
@@ -58,13 +59,14 @@ void draw(Player* snake, int highScore);
 void placeFruit(const std::vector<Position>& snake, Position* fruit);
 void printScoreBoard(int fruitsEaten, int highScore);
 void saveGameConfig(const GameState& game);
+void loadGameConfig(GameState* game);
 
 __attribute__((noreturn)) void setup() {
   GameState game;
   auto cfg = m5::M5Unified::config();
 
   M5Cardputer.begin(cfg);
-  M5Cardputer.Display.setRotation(1);
+  M5Cardputer.Display.setRotation(ROTATION);
   M5Cardputer.Display.setTextSize(2);
   M5Cardputer.Display.setTextColor(TFT_WHITE, TFT_BLACK);
   M5Cardputer.Display.fillScreen(TFT_BLACK);
@@ -302,14 +304,12 @@ void displayGameOver(int fruitsEaten, int highScore) {
 }
 
 void drawStaticElements(int fruitsEaten, int highScore, const Position& fruit) {
-  M5Cardputer.Display.setTextSize(2); // Set font size to 2
   printScoreBoard(fruitsEaten, highScore);
   M5Cardputer.Display.fillCircle(fruit.x, fruit.y, SNAKE_SIZE, TFT_RED);
 }
 
 void draw(Player* snake, int highScore) {
   // Update fruit count without clearing the entire TFT
-  M5Cardputer.Display.setTextSize(2); // Set font size to 2
   if (snake->eatFruit || (snake->prevTail.x <= TFT_WIDTH && snake->prevTail.y <= 20)) {
     printScoreBoard(snake->fruitsEaten, highScore);
     snake->eatFruit = false;
@@ -323,10 +323,15 @@ void draw(Player* snake, int highScore) {
 }
 
 void printScoreBoard(int fruitsEaten, int highScore) {
-  M5Cardputer.Display.setCursor(0, 0);
+  M5Cardputer.Display.setTextSize(1); // Set font size to 2
+  M5Cardputer.Display.pushImage(0, 0, 8, 8, epd_bitmap_fruit);
+  M5Cardputer.Display.setCursor(15, 0);
   M5Cardputer.Display.print("Fruits ");
   M5Cardputer.Display.print(fruitsEaten);
-  M5Cardputer.Display.print(" Record ");
+
+  M5Cardputer.Display.pushImage(100, 0, 8, 8, epd_bitmap_clock);
+  M5Cardputer.Display.setCursor(115, 0);
+  M5Cardputer.Display.print("Record ");
   M5Cardputer.Display.println(highScore);
 }
 
